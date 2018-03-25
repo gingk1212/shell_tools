@@ -1,0 +1,75 @@
+#!/bin/bash
+
+fail() {
+    echo "[FAIL] $@" 1>&2
+    exit 1
+}
+
+usage() {
+    echo "Usage: $0 { host name }" 1>&2
+}
+
+yes_no() {
+    local message=$@
+    while true
+    do
+        read -p "${message} (y/n): " yn
+        case $yn in
+            [Yy]) return 0;;
+            [Nn]) return 1;;
+        esac
+    done
+}
+
+if [[ $# -ne 1 ]]; then
+    usage
+    fail "invalid arguments"
+fi
+
+export LANG=C
+
+host=$1
+shift
+
+echo "$host start..." 1>&2
+
+stty -echo
+echo -n "Please enter the login password: " 1>&2
+read PASS
+echo "" 1>&2
+echo -n "Please enter the enable password: " 1>&2
+read ENAPASS
+stty echo
+echo "" 1>&2
+
+expect -c "
+    set timeout 30
+    spawn telnet ${host}
+    expect \"\[Pp\]assword:\"
+    send \"${PASS}\n\"
+    expect \"\[Pp\]assword:\" {
+        exit 2
+    } \">\" {
+        send \"enable\n\"
+        expect \"\[Pp\]assword:\"
+        send \"${ENAPASS}\n\"
+        expect \"\[Pp\]assword:\" {
+            exit 2
+        } \"${host}#\" {
+            send \"terminal length 0\n\"
+        }
+    }
+
+    expect \"${host}#\"
+    send \"show running-config\n\"
+    expect \"${host}#\"
+    send \"exit\n\"
+"
+
+if [ $? -eq 1 ]; then
+    fail "connection failed"
+elif [ $? -eq 2 ]; then
+    fail "bad password"
+fi
+
+echo "$host done!!" 1>&2

@@ -1,0 +1,38 @@
+#!/bin/bash
+
+fail() {
+    echo "[FAIL] $*" 1>&2
+    exit 1
+}
+
+usage() {
+    echo "Usage: $0 word ..." 1>&2
+}
+
+yes_no() {
+    local message=$*
+    while true
+    do
+        read -p "${message} (y/n): " yn
+        case $yn in
+            [Yy]) return 0;;
+            [Nn]) return 1;;
+        esac
+    done
+}
+
+TMP=$(cat ${HOME}/.ssh/config)
+TMP2=""
+for word in ${@}
+do
+  TMP2=$(echo "$TMP" | sed -n -e "/$word/p")
+  TMP=$TMP2
+done
+for host in $(echo "$TMP" | fgrep Host | awk '{print $2}')
+do
+    yes_no "Do you login $host?"
+    if [ $? -eq 0 ]; then
+        ssh $host
+        exit 0
+    fi
+done

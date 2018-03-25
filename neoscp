@@ -1,0 +1,51 @@
+#!/bin/bash
+
+fail() {
+    echo "[FAIL] $*" 1>&2
+    exit 1
+}
+
+usage() {
+    echo "Usage: $0 { file(from) } { file(to) }" 1>&2
+}
+
+yes_no() {
+    local message=$*
+    while true
+    do
+        read -p "${message} (y/n): " yn
+        case $yn in
+            [Yy]) return 0;;
+            [Nn]) return 1;;
+        esac
+    done
+}
+
+if [ $# -ne 2 ]; then
+    fail "invalid argment"
+fi
+FROM=$1
+TO=$2
+TMPDIR="/tmp/"
+
+# SCP
+if [ "${FROM: -1}" != "/" ]; then
+    FILE=$(echo $FROM | awk -F/ '{ print $NF }')
+else
+    FILE=$(echo $FROM | awk -F/ '{ print $(NF-1) }')
+fi
+yes_no "File name is $FILE, OK?" || fail "user cancel"
+
+echo "scp to local..."
+scp -r $FROM $TMPDIR
+echo "scp to remote..."
+scp -r $TMPDIR/$FILE $TO
+echo "delete local file..."
+rm -ir $TMPDIR/$FILE
+
+# Delete File on FROM list
+HOST=$(echo $FROM | awk -F: '{print $1}')
+FILE_PATH=$(echo $FROM | awk -F: '{print $2}')
+yes_no "Do you delete [$FILE_PATH] on [$HOST]?" || fail "not deleted"
+ssh $HOST rm -ir $FILE_PATH
+echo "Done"
